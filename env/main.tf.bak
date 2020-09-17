@@ -1,0 +1,101 @@
+module "myec2" {
+  source = "../../modules/ec2"
+
+  name = "instance1"
+  instance_type = "t2.micro"
+  ami = "ami-0ebc1ac48dfd14136"
+  subnet_id = aws_subnet.public_subnets.id
+  key_name = "varunp"
+  #subnet_id = module.custom_vpc.public_subnets
+
+
+
+  user_data = <<-EOF
+              #!/bin/bash
+              sudo su
+              yum update
+              yum -y install httpd
+              echo "Hello World" >> /var/www/html/index.html
+              sudo systemctl enable httpd
+              sudo systemctl start httpd
+              EOF
+}
+
+
+module "custom_vpc" {
+  source = "../../modules/vpc"
+
+
+  name = "custom_vpc"
+#  cidr = "{var.vpc_cidr}"
+  cidr = "10.0.0.0/16"
+
+
+#enable_dns_hostnames = true
+#enable_nat_gateway = true
+#enable_vpn_gateway = true
+
+tags = {
+  Name = "customvpc"
+}
+
+}
+
+resource "aws_subnet" "public_subnets" {
+
+  vpc_id            = module.aws_vpc.custom_vpv.id
+  cidr_block        = "10.0.101.0/24"
+  availability_zone = "ap-south-1a"
+
+}
+
+
+
+resource "aws_internet_gateway" "gw" {
+vpc_id = "${aws_vpc.custom_vpc.id}"
+}
+
+
+resource "aws_route_table" "public_route" {
+  vpc_id = aws_vpc.custom_vpc.id
+
+  route {
+    cidr_block = "10.0.1.0/24"
+    gateway_id = aws_internet_gateway.main.id
+  }
+
+  route {
+    ipv6_cidr_block        = "::/0"
+    egress_only_gateway_id = aws_egress_only_internet_gateway.foo.id
+  }
+
+  tags = {
+    Name = "route-table"
+  }
+}
+
+
+/*
+# CALLING VPC module
+
+  module "vpc_custom"{
+  source="./module/.terraform/modules/vpc"
+  # source = "terraform-aws-modules/vpc/aws"
+
+  name = "myfirstvpc"
+  cidr = "10.0.0.0/16"
+
+  azs = ["eu-west-1a"]
+  private_subnets = ["10.0.1.0/24"]
+  public_subnets  = ["10.0.101.0/24"]
+
+  enable_nat_gateway = true
+  enable_vpn_gateway = true
+
+  tags = {
+    Terraform = "true"
+    Environment = "dev"
+}
+
+}
+*/
